@@ -1,0 +1,122 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/wdt.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "serial.h"
+#include "cmdline.h"
+#include "cmd_func.h"
+
+volatile char rData = 0;
+volatile char led = 1;
+volatile char delay = 0;
+
+
+FILE device = FDEV_SETUP_STREAM(TxChar, NULL, _FDEV_SETUP_WRITE);
+FILE device2 = FDEV_SETUP_STREAM(NULL, RxChar, _FDEV_SETUP_READ);
+
+SIGNAL (SIG_UART0_RECV)
+{
+   rData = UDR0;
+}
+
+SIGNAL (SIG_OVERFLOW0){
+
+  TCNT0 = 0;
+  
+
+  if(delay > 49)
+  {	
+	  PORTB = 0x01 << led;
+
+	  led++;
+
+	  if(led > 7)
+	  {
+	    led = 0;
+	  }
+
+	  delay = 0;
+  }
+  else
+  {
+      delay++;
+  }  
+
+}
+
+
+
+int main(void)
+{
+  int nStatus;
+
+  stdout = &device; //printf
+  stdin = &device2; //getchat
+  
+  	
+
+  DDRA = 0xFF;
+  
+
+  //UBRR0H = 0;
+  //UBRR0L = 103;
+  //UCSR0B = 0x18;
+  SER_Init();
+
+  TCCR0 = 0x07;
+  TIMSK = 0x01;
+  TCNT0 = 0;
+	
+  SREG  |= 0x80;
+  //sei();
+
+  printf("\n\rUART Printf Example: retarget the C library printf function to the UART\n\r");
+  printf("Compile Data[%s] , Time[%s],Line[%d] \n\r" ,	__DATE__,__TIME__,__LINE__);
+
+  while(1)
+  {
+				//
+        // Print a prompt to the console.  Show the CWD.
+        //
+        printf("cmd> ");
+
+        //
+        // Get a line of text from the user.
+        //
+        UARTgets(g_pcCmdBuf, sizeof(g_pcCmdBuf));
+
+        //
+        // Pass the line from the user to the command processor.  It will be
+        // parsed and valid commands executed.
+        //
+        nStatus = CmdLineProcess(g_pcCmdBuf);
+
+        //
+        // Handle the case of bad command.
+        //
+        if(nStatus == CMDLINE_BAD_CMD)
+        {
+            printf("Bad command!\n\r");
+        }
+
+        //
+        // Handle the case of too many arguments.
+        //
+        else if(nStatus == CMDLINE_TOO_MANY_ARGS)
+        {
+            printf("Too many arguments for command processor!\n\r");
+        }
+
+        //
+        // Otherwise the command was executed.  Print the error code if one was
+        // returned.
+        //
+        else if(nStatus != 0)
+        {
+            //printf("Command returned error code \n");
+        }
+  }
+  return 0;
+}

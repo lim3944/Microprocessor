@@ -1,0 +1,52 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+
+char msg1[100] = "Serial Cpmmunication test \n\r";
+char *pMsg;
+char sizeMsg1;
+char pe = 0;
+
+volatile char rData = 0;
+
+SIGNAL (SIG_UART0_RECV)
+{
+   rData = UDR0;
+}
+
+
+void send()
+{
+  while(*pMsg)
+  {
+     while(!(UCSR0A & 0x20));
+	 UDR0 = *pMsg++;
+  }
+}
+
+
+
+int main(void)
+{
+  pMsg = msg1;
+  DDRE = 0x02;
+  PORTE = 0xFF;
+
+  UBRR0H = 0;
+  UBRR0L = 95;
+  UCSR0B = 0x98;
+  SREG  |= 0x80;
+  send();
+
+  while(1)
+  {
+     if(rData)
+	 {
+                msg1[0] = rData;
+		msg1[1] = 0x00;
+		pMsg = msg1;
+		send();
+		rData = 0;
+	 }
+  }
+  return 0;
+}
